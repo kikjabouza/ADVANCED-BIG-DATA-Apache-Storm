@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.bigdata</groupId>
+    <artifactId>logstorm</artifactId>
+    <version>1.0</version>
+    <packaging>jar</packaging>
+    <name>LogStorm</name>
+    <description>Surveillance de logs web en temps réel avec Apache Storm (projet pédagogique)</description>
+
+    <properties>
+        <!-- Doit correspondre à STORM_VERSION dans .env (version du cluster) -->
+        <storm.version>3.2.0</storm.version>
+        <!-- Storm 3.x tourne sur Java 25 ; mettre 17 pour Storm 2.8.x -->
+        <java.release>25</java.release>
+        <maven.compiler.release>${java.release}</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- API Storm. Scope "provided" : le cluster fournit déjà ces classes,
+             on ne les embarque donc pas dans notre jar. -->
+        <dependency>
+            <groupId>org.apache.storm</groupId>
+            <artifactId>storm-client</artifactId>
+            <version>${storm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- Produit target/logstorm-1.0.jar -->
+        <finalName>logstorm-1.0</finalName>
+    </build>
+</project>

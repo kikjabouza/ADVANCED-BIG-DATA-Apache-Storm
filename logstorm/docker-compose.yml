@@ -1,0 +1,43 @@
+# Cluster Apache Storm complet sur un seul PC.
+# Démarrage : docker compose up -d --scale supervisor=2
+# Version de Storm : définie dans le fichier .env (STORM_VERSION).
+
+# Nom du projet Compose : fixe le préfixe des conteneurs (logstorm-nimbus-1,
+# logstorm-supervisor-2...) même si le dossier est renommé.
+name: logstorm
+
+services:
+  # Coordination distribuée : état du cluster, heartbeats, élection du leader.
+  # Le nom "zookeeper" est OBLIGATOIRE : l'image storm s'y connecte par ce nom.
+  zookeeper:
+    image: zookeeper:3.9
+    restart: always
+
+  # Nœud maître : reçoit les .jar, planifie les workers sur les supervisors.
+  # Le nom "nimbus" est OBLIGATOIRE (nimbus.seeds de l'image officielle).
+  nimbus:
+    image: storm:${STORM_VERSION}
+    command: storm nimbus
+    depends_on: [zookeeper]
+    restart: always
+    ports:
+      - "6627:6627"          # port Thrift de Nimbus (soumission des topologies)
+    volumes:
+      - ./target:/jars       # le .jar compilé dans target/ est visible dans /jars
+
+  # Machine de travail : lance les JVM workers (4 slots : ports 6700-6703).
+  # Pas de container_name : on peut en lancer plusieurs avec --scale supervisor=2.
+  supervisor:
+    image: storm:${STORM_VERSION}
+    command: storm supervisor
+    depends_on: [nimbus, zookeeper]
+    restart: always
+
+  # Interface web de supervision : http://localhost:8080
+  ui:
+    image: storm:${STORM_VERSION}
+    command: storm ui
+    depends_on: [nimbus]
+    restart: always
+    ports:
+      - "8080:8080"
