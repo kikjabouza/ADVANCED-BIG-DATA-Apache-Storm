@@ -60,7 +60,12 @@ public class LogStormTopology {
 
         Config conf = new Config();
         conf.setNumWorkers(2);           // 2 JVM workers (réparties sur les supervisors)
-        conf.setMaxSpoutPending(1000);   // max 1000 tuples "en vol" (non ackés) par task de spout
+        // Max de tuples "en vol" (émis mais pas encore ackés) par task de spout.
+        // ATTENTION avec un bolt fenêtré : ses tuples ne sont ackés qu'à la FERMETURE de la
+        // fenêtre (10 s). Il faut donc pending > débit x durée de rétention
+        // (~200/s x ~20 s = 4000). Avec 1000, le spout serait bloqué par à-coups
+        // (~45 lignes/s au lieu de 200) et les comptes par fenêtre seraient faussés.
+        conf.setMaxSpoutPending(5000);
         conf.setMessageTimeoutSecs(30);  // un tuple non acké en 30 s => fail() puis rejeu.
                                          // Doit être > durée de fenêtre (10 s) pour les bolts fenêtrés.
 

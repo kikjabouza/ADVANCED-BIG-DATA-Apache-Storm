@@ -35,24 +35,25 @@ public class ReportBolt extends BaseBasicBolt {
 
     @Override
     public void execute(Tuple tuple, BasicOutputCollector collector) {
-        // 1) Tick tuple : on affiche le classement puis on remet à zéro
+        // 1) Tick tuple : on affiche le classement de toutes les pages connues
         if (TupleUtils.isTick(tuple)) {
-            if (latest.isEmpty()) return;
-            StringBuilder sb = new StringBuilder("\n[RAPPORT] Requêtes par page (10 dernières secondes)\n");
+            if (latest.isEmpty()) return;               // aucune fenêtre fermée pour l'instant
+            StringBuilder sb = new StringBuilder("\n[RAPPORT] Requêtes par page (dernière fenêtre de 10 s)\n");
             latest.entrySet().stream()
                   .sorted((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0]))   // tri décroissant
                   .forEach(e -> sb.append(String.format("  %-14s %5d req   latence moy. %4d ms%n",
                           e.getKey(), e.getValue()[0], e.getValue()[1])));
             LOG.info(sb.toString());
-            latest.clear();
             return;
         }
 
-        // 2) Tuple normal : on agrège (une URL peut arriver plusieurs fois si plusieurs
-        //    fenêtres se sont fermées depuis le dernier tick)
-        latest.merge(tuple.getStringByField("url"),
-                new long[]{tuple.getLongByField("count"), tuple.getLongByField("avgLatency")},
-                (a, b) -> new long[]{a[0] + b[0], (a[1] + b[1]) / 2});
+        // 2) Tuple normal : le compte d'une fenêtre fermée pour une URL.
+        //    On REMPLACE l'ancienne valeur : la map contient toujours, pour chaque page,
+        //    le résultat de sa dernière fenêtre complète. Les 2 tasks page-count ne ferment
+        //    pas leurs fenêtres exactement au même instant que le tick : en gardant la
+        //    dernière valeur (au lieu de cumuler puis vider), chaque rapport reste complet.
+        latest.put(tuple.getStringByField("url"),
+                new long[]{tuple.getLongByField("count"), tuple.getLongByField("avgLatency")});
     }
 
     /** Bolt terminal : il n'émet rien. */

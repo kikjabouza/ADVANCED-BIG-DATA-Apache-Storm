@@ -26,7 +26,7 @@
 | 0:45 | `make deploy` | terminal A | « J'envoie mon jar à Nimbus, qui va répartir le travail. » (`storm list` → ACTIVE) |
 | 1:00 | **F5**, clic **logstorm**, **Show Visualization** | Storm UI | « Voilà notre DAG, vivant : un spout, quatre bolts, deux streams. » |
 | 1:30 | `make logs` | terminal B | « Toutes les 10 secondes, le classement des pages de la dernière fenêtre. » |
-| 2:00 | Attendre un `[ALERTE]` (≤ 40 s ; pendant une rafale on voit le compteur exploser) | terminal B | « Une rafale d'erreurs 500 : l'alerte part en temps réel, sans attendre un batch. » |
+| 2:00 | Attendre une `[ALERTE]` à **plusieurs centaines** d'erreurs (rafale, ≤ 40 s) ; hors rafale on voit ~40 | terminal B | « Une rafale d'erreurs 500 : l'alerte part en temps réel, sans attendre un batch. » |
 | 2:40 | `make rebalance` | terminal A | « Je passe à 3 workers et 4 executors de parsing, **sans redéployer**. » |
 | 3:10 | `make chaos` | terminal A | « Je débranche une machine. » |
 | 3:40 | F5 sur la page d'accueil (**Supervisor Summary**) puis la topologie | Storm UI | « Nimbus a vu la panne dans ZooKeeper et a réassigné les workers ; les rapports continuent. » |
@@ -34,22 +34,24 @@
 
 Après la démo : `make kill` puis `make down`.
 
-> ⏱️ `make chaos` attend 60 s par défaut. Pour coller au minutage : `bash scripts/chaos.sh 50`.
+> ⏱️ `make chaos` attend 60 s par défaut. Mesuré pendant le TP : le supervisor disparaît de l'UI
+> en quelques secondes, mais la réassignation complète des workers prend **~1 min 30**. Pour la
+> démo, gardez 60 s et montrez *Supervisor Summary* (1 machine) puis les `[RAPPORT]` qui continuent.
 >
 > 📝 Pendant le rebalance, la topologie est **réorganisée** pendant ~15 s : quelques secondes
 > sans `[RAPPORT]` est normal. Après la panne, *Failed* peut augmenter : ce sont les tuples
 > **rejoués** (at-least-once) — profitez-en pour le dire.
 
-## Ce que vous devez voir (exemple)
+## Ce que vous devez voir (sortie réelle du TP)
 
 ```
-[supervisor-1] 2026-11-21 10:00:10.004 c.b.l.b.ReportBolt ... [INFO]
-[supervisor-1] [RAPPORT] Requêtes par page (10 dernières secondes)
-[supervisor-1]   /produits        241 req   latence moy.  139 ms
-[supervisor-1]   /panier          236 req   latence moy.  127 ms
-[supervisor-1]   /recherche       230 req   latence moy.  131 ms
+[supervisor-1] [RAPPORT] Requêtes par page (dernière fenêtre de 10 s)
+[supervisor-1]   /panier          259 req   latence moy.  153 ms
+[supervisor-1]   /produits/42     239 req   latence moy.  151 ms
+[supervisor-1]   /produits        228 req   latence moy.  167 ms
 ...
-[supervisor-2] 2026-11-21 10:00:33.512 c.b.l.b.ErrorAlertBolt ... [WARN] [ALERTE] 16 erreurs 5xx en 10 s (dernière sur /paiement, statut 503)
+[supervisor-1] 2026-11-24 01:45:31.510 c.b.l.b.ErrorAlertBolt Thread-16-error-alert-executor[3, 3] [WARN] [ALERTE] 31 erreurs 5xx en 10 s (...)
+[supervisor-1] 2026-11-24 01:49:51.127 c.b.l.b.ErrorAlertBolt Thread-16-error-alert-executor[3, 3] [WARN] [ALERTE] 565 erreurs 5xx en 10 s (...)
 ```
 
 > Les chiffres varient (génération aléatoire). `ReportBolt` et `ErrorAlertBolt` peuvent être

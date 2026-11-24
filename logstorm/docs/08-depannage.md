@@ -7,13 +7,16 @@
 | `PKIX path building failed` / `unable to find valid certification path` pendant `build` | un **antivirus** (Avast, AVG, Kaspersky, ESET...) ou un proxy d'entreprise **intercepte le HTTPS** ; Java dans le conteneur ne connaît pas son certificat | voir [§ Antivirus](#antivirus--pkix-path-building-failed) ci-dessous |
 | `Bind for 0.0.0.0:8080 failed: port is already allocated` | une autre appli utilise 8080 (Tomcat, Jenkins, XAMPP...) | dans `docker-compose.yml`, service `ui` : `"8081:8080"`, puis ouvrir <http://localhost:8081> |
 | Cluster Summary : **Free slots = 0** / topologie sans workers | pas assez de slots ou supervisors pas démarrés | `docker compose up -d --scale supervisor=2` ; vérifier *Supervisor Summary* |
-| `Topology with name logstorm already exists` | ancienne version encore active | `make kill`, attendre ~10 s (`make list` vide), redéployer |
+| `Topology name logstorm is either not allowed or it already exists on the cluster` | ancienne version encore active | `make kill`, attendre ~10 s (`make list` vide), redéployer |
 | Pas de `[RAPPORT]` dans `make logs` | les workers ne sont pas encore démarrés (~20 s), ou topologie non déployée | attendre 30 s et relancer `make logs` ; `make list` doit afficher ACTIVE ; en commande brute, essayer `--index 2` |
 | `the input device is not a TTY` (Git Bash) | `docker compose exec` veut un terminal interactif | ajouter **`-T`** après `exec` (les scripts le font déjà) |
 | Git Bash : chemins bizarres `C:/Program Files/Git/app` | Git Bash réécrit les chemins Unix | `export MSYS_NO_PATHCONV=1` (déjà dans les scripts) |
 | Docker Desktop ne démarre pas / *WSL 2 installation is incomplete* | WSL 2 ou virtualisation absents | PowerShell **admin** : `wsl --install` puis redémarrer ; si besoin `wsl --update` ; activer *Intel VT-x* / *AMD SVM* dans le BIOS |
 | `error during connect ... dockerDesktopLinuxEngine` | Docker Desktop n'est pas lancé | ouvrir Docker Desktop et attendre **Engine running** |
 | `/jars/logstorm-1.0.jar` introuvable | jar non compilé, ou cluster lancé depuis un autre dossier | `make build`, puis vérifier `ls target/` ; lancer `docker compose` depuis `logstorm/` |
+| `[RAPPORT]` avec des comptes très inégaux (~110 pour certaines pages, ~20 pour d'autres) et débit faible | `maxSpoutPending` trop petit pour un bolt fenêtré : les tuples ne sont ackés qu'à la fin de la fenêtre, le spout se bloque par à-coups | `setMaxSpoutPending` > débit × ~20 s (5000 ici) |
+| `ERROR ... BlobStoreUtils - Could not download the blob` au début de `storm local` | course au démarrage du Nimbus local | sans conséquence, ignorer |
+| Nombreux `WARN ... pacemaker... is a deprecated config` | avertissements internes de Storm 3.2.0 | sans conséquence, ignorer |
 | Conteneurs qui redémarrent en boucle | pas assez de mémoire | Docker Desktop → Settings → Resources → Memory ≥ 4 Go |
 | `Failed` qui augmente dans l'UI | timeouts (bolt saturé) ou panne de worker | normal après `make chaos` (rejeux) ; sinon regarder *Capacity* et augmenter le parallélisme |
 | PowerShell : *l'exécution de scripts est désactivée* | politique d'exécution | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |

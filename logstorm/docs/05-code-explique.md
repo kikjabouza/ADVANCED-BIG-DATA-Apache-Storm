@@ -27,7 +27,7 @@ fournit, on ne l'embarque pas). Le jar produit fait donc ~15 Ko.
 |---|---|
 | Constantes `PAGES`, `METHODS`, taux | 8 pages ; 2 % d'erreurs 5xx normalement, **35 %** pendant une **rafale de 10 s toutes les 40 s** |
 | Champs `collector`, `random`, `pending` | initialisés dans **`open()`**, pas dans le constructeur : le spout est **sérialisé** puis envoyé au worker, `open()` s'exécute sur le worker |
-| `nextTuple()` | `Utils.sleep(5)` → ~200 lignes/s ; génère un **msgId UUID**, mémorise la ligne dans `pending`, puis `emit(new Values(line), msgId)` : le msgId rend le tuple **suivi** par les ackers |
+| `nextTuple()` | `Utils.sleep(5)` → au plus ~200 lignes/s (~175 mesurées) ; génère un **msgId UUID**, mémorise la ligne dans `pending`, puis `emit(new Values(line), msgId)` : le msgId rend le tuple **suivi** par les ackers |
 | `inErrorBurst()` | vrai quand `secondes % 40 >= 30` → secondes 30 à 39 de chaque cycle |
 | `buildLine()` | tire une IP, une page, un statut (500/503, sinon 404 à 8 %, sinon 200) ; les erreurs ont une latence de 800-2800 ms |
 | `ack(msgId)` | l'arbre est complet : on retire la ligne de `pending` |
@@ -77,7 +77,7 @@ compte est **complet**.
 Pourquoi `globalGrouping` ? Il faut **un seul** compteur pour tout le site : toutes les erreurs
 doivent arriver à la même task.
 
-Pourquoi une alerte ? En temps normal : 200 lignes/s × 2 % ≈ **4 erreurs/s → ~40 en 10 s**...
+Pourquoi une alerte ? En temps normal : ~175-200 lignes/s × 2 % ≈ **~40 erreurs en 10 s** (mesuré : 31 à 46)...
 > 🔎 **Question piège** — Avec ces chiffres, le seuil de 15 n'est-il pas dépassé en permanence ?
 > Calculez : oui, ~40 erreurs/10 s même hors rafale. Le cooldown limite à **une alerte toutes
 > les 10 s**, et pendant la rafale on monte à ~700 erreurs/10 s. Pour n'alerter **que** pendant
@@ -88,8 +88,13 @@ Pourquoi une alerte ? En temps normal : 200 lignes/s × 2 % ≈ **4 erreurs/s �
 | Bloc | Explication |
 |---|---|
 | `getComponentConfiguration()` | config **propre à ce bolt** : `TOPOLOGY_TICK_TUPLE_FREQ_SECS = 10` |
-| tuple normal | `latest.merge(url, [count, avg])` : agrège ce que les 2 tasks `page-count` envoient |
-| tick tuple (`TupleUtils.isTick`) | trie par nombre décroissant, construit le bloc `[RAPPORT]`, `LOG.info`, vide la map |
+| tuple normal | `latest.put(url, [count, avg])` : **remplace** la valeur de cette URL par le résultat de sa dernière fenêtre fermée |
+| tick tuple (`TupleUtils.isTick`) | trie par nombre décroissant, construit le bloc `[RAPPORT]`, `LOG.info` (sans vider la map) |
+
+> Pourquoi remplacer plutôt que cumuler puis vider ? Les 2 tasks `page-count` ne ferment pas
+> leurs fenêtres au même instant que le tick de `ReportBolt`. Une première version qui cumulait
+> puis vidait la map à chaque tick affichait des rapports **incomplets** (3 à 6 pages au lieu de 8,
+> et des comptes partiels). En gardant la dernière fenêtre de chaque page, chaque rapport est complet.
 | `declareOutputFields` vide | bolt **terminal** |
 
 > Les logs `LOG.info/warn` vont dans le `worker.log` du worker qui héberge le bolt
@@ -114,7 +119,7 @@ builder.setBolt("report", new ReportBolt(), 1).globalGrouping("page-count");
 | `.shuffleGrouping("log-spout")` | s'abonne au stream `default` de `log-spout` |
 | `.globalGrouping("parse", ERROR_STREAM)` | s'abonne au stream **nommé** `errors` |
 | `setNumWorkers(2)` | 2 JVM → réparties sur les 2 supervisors |
-| `setMaxSpoutPending(1000)` | contre-pression |
+| `setMaxSpoutPending(5000)` | contre-pression ; doit dépasser débit × rétention de la fenêtre (voir [04-concepts.md](04-concepts.md)) |
 | `setMessageTimeoutSecs(30)` | > fenêtre de 10 s, obligatoire |
 | `StormSubmitter.submitTopology` | envoie au cluster ; en `storm local`, intercepté → LocalCluster |
 

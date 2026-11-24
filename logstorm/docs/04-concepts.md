@@ -88,8 +88,17 @@ Storm garantit que **chaque tuple du spout est entièrement traité, ou rejoué*
 Conséquence : **pas de perte**, mais des **doublons possibles** (un tuple rejoué peut avoir
 été compté une première fois). Pour de l'*exactly-once* : Trident, ou des écritures idempotentes.
 
-`maxSpoutPending(1000)` limite le nombre d'arbres en vol par task de spout : c'est le
+`maxSpoutPending(5000)` limite le nombre d'arbres en vol par task de spout : c'est le
 mécanisme de **contre-pression** (backpressure) le plus simple.
+
+> ⚠️ **Piège observé pendant le TP** : avec un bolt fenêtré, les tuples restent « en vol » jusqu'à la
+> fermeture de la fenêtre. Avec `maxSpoutPending(1000)`, le spout était bloqué par à-coups (~45
+> lignes/s au lieu de ~175) et les comptes par fenêtre devenaient incohérents (~110 pour certaines
+> pages, ~20 pour d'autres). Règle : `maxSpoutPending` > débit × durée de rétention (~200 × 20 s).
+
+**Preuve mesurée de l'at-least-once** : après l'arrêt brutal de `supervisor-2` (`make chaos`),
+Storm UI affichait *Failed* ≈ 4 900 et le spout a loggué **~5 000 `Rejeu du message`** : les
+tuples qui étaient dans les workers tués ont tous été réémis, aucun n'a été perdu.
 
 ## Fenêtrage
 Un flux est infini : pour compter, on le découpe en **fenêtres**.

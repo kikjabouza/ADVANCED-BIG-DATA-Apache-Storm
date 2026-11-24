@@ -59,7 +59,7 @@ Cliquez sur **10m 0s** pour que les tableaux Spouts/Bolts affichent cette pério
 | *Executors / Tasks* | parallélisme | 1 / 1 |
 | *Emitted* | tuples émis | augmente d'environ 200/s |
 | *Transferred* | tuples envoyés à d'autres tasks | ≈ Emitted |
-| *Complete latency (ms)* | temps moyen pour qu'un arbre de tuples soit entièrement acké | quelques secondes (la fenêtre de 10 s retient les tuples) |
+| *Complete latency (ms)* | temps moyen pour qu'un arbre de tuples soit entièrement acké | **~15 s** mesurées : la fenêtre de 10 s retient les tuples avant l'ack (d'où le timeout de 30 s) |
 | *Acked* | arbres terminés avec succès | augmente, suit Emitted |
 | *Failed* | arbres échoués ou en timeout (rejoués) | **0** en temps normal |
 
@@ -98,8 +98,8 @@ qu'on vérifie que les 2 executors de `page-count` sont sur des workers différe
 | Action | Où regarder | Ce qui change |
 |---|---|---|
 | `make deploy` | Topology Summary | une ligne `logstorm`, ACTIVE ; *Used slots* passe à 2 |
-| `make rebalance` | Topology summary | *Num workers* 2 → 3 ; page `parse` : 4 executors |
-| `make chaos` | Supervisor Summary | après 30-60 s : 1 seul supervisor ; les workers sont réassignés |
+| `make rebalance` | Topology summary | *Num workers* 2 → 3 ; page `parse` : 4 executors (~30 s) ; les compteurs repartent de zéro |
+| `make chaos` | Supervisor Summary | en quelques secondes : 1 seul supervisor ; ~1 min 30 plus tard tous les workers sont sur supervisor-1 ; *Failed* augmente (rejeux) |
 | retour de supervisor-2 | Supervisor Summary | 2 supervisors à nouveau |
 
 ➡️ Suite : [04-concepts.md](04-concepts.md)
